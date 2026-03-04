@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>OLX Car Analyzer — Bahia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="dados_olx.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#0d0f14;--panel:#13161d;--border:#1e2330;
+  --accent:#f0c040;--accent2:#3ecf8e;--red:#e84d3d;--blue:#4d9de0;
+  --text:#e0e4ef;--muted:#6b7391;
+  --eco:#3ecf8e;--inter:#f0c040;--padrao:#e67e22;--premium:#e84d3d;--luxo:#9b59b6;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow:hidden;}
+#app{display:grid;grid-template-columns:1fr 360px;grid-template-rows:54px 1fr;height:100vh;}
+
+/* Header */
+header{grid-column:1/-1;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel);gap:8px;}
+header h1{font-size:15px;font-weight:800;letter-spacing:.08em;color:var(--accent);white-space:nowrap;}
+header h1 span{color:var(--muted);font-weight:400;}
+.hdr-controls{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;flex-wrap:wrap;}
+.search-wrap{position:relative;}
+#searchInput{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:20px;font-size:12px;font-family:'Syne',sans-serif;padding:5px 12px 5px 30px;width:210px;outline:none;transition:border-color .18s;}
+#searchInput:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none;}
+#searchResults{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:200;background:var(--panel);border:1px solid var(--border);border-radius:10px;max-height:280px;overflow-y:auto;display:none;box-shadow:0 8px 28px #000c;}
+#searchResults::-webkit-scrollbar{width:4px;}
+#searchResults::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.sr-item{padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;}
+.sr-item:last-child{border:none;}
+.sr-item:hover{background:#1a1e2e;}
+.sr-marca{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';}
+.sr-modelo{font-size:13px;font-weight:700;}
+.sr-info{font-size:11px;color:var(--accent2);font-family:'JetBrains Mono';margin-top:2px;}
+.sr-no{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
+select.pill-sel{padding:4px 10px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:20px;font-size:11px;font-family:'Syne',sans-serif;outline:none;}
+.pill{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text);font-family:'Syne',sans-serif;letter-spacing:.05em;transition:all .18s;white-space:nowrap;}
+.pill.active,.pill:hover{background:var(--accent);color:#000;border-color:var(--accent);}
+.pill-algo{border-color:#4d9de0;color:#4d9de0;}
+.pill-algo.active,.pill-algo:hover{background:#4d9de0;color:#000;border-color:#4d9de0;}
+.pill-algo.prim-active{background:#3ecf8e!important;color:#000!important;border-color:#3ecf8e!important;}
+.pill-algo.kruskal-active{background:#9b59b6!important;color:#fff!important;border-color:#9b59b6!important;}
+
+/* Graph */
+#graph-area{position:relative;overflow:hidden;background:radial-gradient(ellipse at 30% 40%,#161a28 0%,var(--bg) 70%);}
+#graph-area svg{width:100%;height:100%;}
+
+/* Car detail */
+#car-detail{position:absolute;top:12px;left:12px;z-index:50;background:rgba(19,22,29,.95);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;min-width:230px;max-width:290px;backdrop-filter:blur(6px);display:none;}
+.cd-close{float:right;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;}
+.cd-marca{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:.08em;}
+.cd-modelo{font-size:18px;font-weight:800;color:var(--accent);line-height:1.2;margin-bottom:2px;}
+.cd-titulo{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4;}
+.cd-price{font-size:24px;font-weight:800;color:var(--accent2);font-family:'JetBrains Mono';margin-bottom:10px;}
+.cd-row{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border);}
+.cd-row:last-of-type{border:none;}
+.cd-lbl{color:var(--muted);}
+.cd-val{font-family:'JetBrains Mono';}
+.cd-link{display:block;margin-top:10px;text-align:center;font-size:11px;color:var(--blue);text-decoration:none;font-family:'JetBrains Mono';border:1px solid var(--blue);border-radius:6px;padding:5px;transition:all .18s;}
+.cd-link:hover{background:var(--blue);color:#000;}
+
+/* Algo legend */
+#algo-legend{position:absolute;top:12px;right:12px;z-index:50;background:rgba(19,22,29,.93);border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-width:230px;display:none;font-size:11px;line-height:1.7;}
+#algo-legend .al-title{font-size:12px;font-weight:800;color:var(--accent);margin-bottom:6px;}
+#algo-legend .al-step{color:var(--muted);font-family:'JetBrains Mono';font-size:10px;}
+#algo-legend .al-cost{color:var(--accent2);font-weight:700;}
+
+.tooltip{position:absolute;pointer-events:none;background:#1a1e2e;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;font-family:'JetBrains Mono';max-width:230px;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .15s;z-index:100;}
+.tooltip .tt-title{font-size:13px;font-weight:700;font-family:'Syne';color:var(--accent);margin-bottom:4px;}
+
+#legend{position:absolute;bottom:14px;left:14px;background:rgba(19,22,29,.88);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px;}
+#legend .leg-title{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.leg-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+/* Side panel */
+#side-panel{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;display:flex;flex-direction:column;}
+#side-panel::-webkit-scrollbar{width:4px;}
+#side-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.section-tab{display:flex;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:10;}
+.tab-btn{flex:1;padding:10px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);font-family:'Syne',sans-serif;border-bottom:2px solid transparent;transition:all .18s;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-content{display:none;padding:14px;}
+.tab-content.active{display:block;}
+.city-card{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all .18s;position:relative;}
+.city-card:hover,.city-card.selected{border-color:var(--accent);background:#1a1e2e;}
+.cc-name{font-size:13px;font-weight:700;margin-bottom:4px;}
+.cc-price{font-size:18px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono';}
+.cc-min{font-size:10px;color:var(--accent2);font-family:'JetBrains Mono';}
+.cc-count{font-size:10px;color:var(--muted);margin-top:2px;}
+.cc-bar{height:3px;border-radius:2px;margin-top:8px;background:var(--border);}
+.cc-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent2),var(--accent));}
+.rank-badge{position:absolute;right:10px;top:10px;font-size:10px;font-weight:800;color:var(--muted);font-family:'JetBrains Mono';}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.stat-row:last-child{border:none;}
+.stat-label{color:var(--muted);}
+.stat-val{font-family:'JetBrains Mono';font-weight:600;}
+.stat-val.green{color:var(--eco);}
+.stat-val.yellow{color:var(--accent);}
+.stat-val.red{color:var(--red);}
+.sec-hdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.freq-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;}
+.freq-label{width:88px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'JetBrains Mono';}
+.freq-track{flex:1;background:var(--border);border-radius:2px;height:10px;}
+.freq-fill{height:100%;border-radius:2px;}
+.freq-count{width:24px;text-align:right;color:var(--muted);font-family:'JetBrains Mono';}
+.faixa-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:'JetBrains Mono';}
+.f-eco{background:#1a3d2e;color:var(--eco);}
+.f-inter{background:#3d3210;color:var(--inter);}
+.f-pad{background:#3d2a10;color:var(--padrao);}
+.f-prem{background:#3d1a1a;color:var(--premium);}
+.f-luxo{background:#2a1a3d;color:var(--luxo);}
+.no-data{color:var(--muted);font-size:12px;padding:20px 0;text-align:center;}
+.data-warn{background:#3d3210;border:1px solid var(--inter);border-radius:8px;padding:16px;margin:40px auto;max-width:440px;font-size:12px;color:var(--inter);text-align:center;line-height:1.7;}
+.data-warn code{background:#0007;padding:2px 6px;border-radius:4px;}
+.cheap-row:hover .stat-val{color:var(--accent2)!important;}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <h1>OLX ANALYZER <span>— Bahia</span></h1>
+  <div class="hdr-controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Buscar carro…">
+      <div id="searchResults"></div>
+    </div>
+    <select id="filterBrand" class="pill-sel"><option value="">Todas as marcas</option></select>
+    <button class="pill active" data-mode="grafo">Grafo</button>
+    <button class="pill" data-mode="bolhas">Bolhas</button>
+    <button class="pill pill-algo" id="btnPrim">🌲 Prim</button>
+    <button class="pill pill-algo" id="btnKruskal">🔗 Kruskal</button>
+    <button class="pill" id="btnReset" style="display:none;border-color:var(--muted)">✕ Limpar</button>
+  </div>
+</header>
+
+<div id="graph-area">
+  <svg id="main-svg"></svg>
+  <div id="car-detail">
+    <span class="cd-close" id="closeDetail">✕</span>
+    <div class="cd-marca" id="det-marca"></div>
+    <div class="cd-modelo" id="det-modelo"></div>
+    <div class="cd-titulo" id="det-titulo"></div>
+    <div class="cd-price" id="det-price"></div>
+    <div class="cd-row"><span class="cd-lbl">Cidade</span><span class="cd-val" id="det-cidade"></span></div>
+    <div class="cd-row"><span class="cd-lbl">Bairro</span><span class="cd-val" id="det-bairro"></span></div>
+    <div class="cd-row"><span class="cd-lbl">Ano</span><span class="cd-val" id="det-ano"></span></div>
+    <div class="cd-row"><span class="cd-lbl">KM</span><span class="cd-val" id="det-km"></span></div>
+    <a class="cd-link" id="det-link" target="_blank" rel="nofollow">↗ Ver anúncio na OLX</a>
+  </div>
+  <div id="algo-legend">
+    <div class="al-title" id="al-title"></div>
+    <div id="al-body"></div>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+  <div id="legend">
+    <div class="leg-title">Faixa de preço</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#3ecf8e"></div> Econômico (&lt;35k)</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#f0c040"></div> Intermediário (35–70k)</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#e67e22"></div> Padrão (70–120k)</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#e84d3d"></div> Premium (120–250k)</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#9b59b6"></div> Luxo (&gt;250k)</div>
+  </div>
+</div>
+
+<div id="side-panel">
+  <div class="section-tab">
+    <button class="tab-btn active" data-tab="cidades">Cidades</button>
+    <button class="tab-btn" data-tab="estatisticas">Stats</button>
+    <button class="tab-btn" data-tab="frequencias">Freq.</button>
+  </div>
+  <div class="tab-content active" id="tab-cidades"></div>
+  <div class="tab-content" id="tab-estatisticas"></div>
+  <div class="tab-content" id="tab-frequencias"></div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+let records=[], selectedBrand='', viewMode='grafo';
+let simulation, zoomBehavior, graphG;
+let algoActive=null; // 'prim' | 'kruskal' | null
+
+const FC={'Econômico':'#3ecf8e','Intermediário':'#f0c040','Padrão':'#e67e22','Premium':'#e84d3d','Luxo':'#9b59b6'};
+const FK={'Econômico':'f-eco','Intermediário':'f-inter','Padrão':'f-pad','Premium':'f-prem','Luxo':'f-luxo'};
+
+function cat(v){if(v<35000)return'Econômico';if(v<70000)return'Intermediário';if(v<120000)return'Padrão';if(v<250000)return'Premium';return'Luxo';}
+function fmt(v){return'R$ '+Math.round(v).toLocaleString('pt-BR');}
+function fmtKm(v){return v!=null?Number(v).toLocaleString('pt-BR')+' km':'—';}
+function getFiltered(){return selectedBrand?records.filter(r=>r.marca===selectedBrand):records;}
+
+function loadData(){
+  if(typeof window.OLX_DATA!=='undefined'&&window.OLX_DATA.length>0){records=window.OLX_DATA;return true;}
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPUTED
+// ═══════════════════════════════════════════════════════════════════════════════
+function cityStats(recs){
+  const m={};
+  recs.forEach(r=>{
+    if(!m[r.cidade])m[r.cidade]={cidade:r.cidade,vals:[],marcas:new Set(),faixas:{}};
+    m[r.cidade].vals.push(r.valor);m[r.cidade].marcas.add(r.marca);
+    const f=cat(r.valor);m[r.cidade].faixas[f]=(m[r.cidade].faixas[f]||0)+1;
+  });
+  return Object.values(m).map(c=>({
+    cidade:c.cidade,preco_medio:d3.mean(c.vals),preco_min:d3.min(c.vals),
+    preco_max:d3.max(c.vals),total:c.vals.length,marcas:[...c.marcas],faixas:c.faixas
+  })).sort((a,b)=>a.preco_medio-b.preco_medio);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════════
+function initBrandFilter(){
+  const brands=[...new Set(records.map(r=>r.marca))].sort();
+  const sel=document.getElementById('filterBrand');
+  brands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o);});
+  sel.addEventListener('change',()=>{selectedBrand=sel.value;clearAlgo();refresh();});
+}
+
+function initSearch(){
+  const input=document.getElementById('searchInput'),results=document.getElementById('searchResults');
+  input.addEventListener('input',()=>{
+    const q=input.value.trim().toLowerCase();
+    if(q.length<2){results.style.display='none';return;}
+    const seen=new Map();
+    records.forEach(r=>{
+      if(!((r.modelo||'')+(r.titulo||'')+(r.marca||'')).toLowerCase().includes(q))return;
+      const k=r.marca+'||'+(r.modelo||r.titulo);
+      if(!seen.has(k)||r.valor<seen.get(k).valor)seen.set(k,r);
+    });
+    const matches=[...seen.values()].sort((a,b)=>a.valor-b.valor).slice(0,12);
+    if(!matches.length){results.innerHTML='<div class="sr-no">Nenhum resultado</div>';results.style.display='block';return;}
+    results.innerHTML=matches.map((r,i)=>`
+      <div class="sr-item" data-i="${i}">
+        <div class="sr-marca">${r.marca}</div>
+        <div class="sr-modelo">${r.modelo||r.titulo}</div>
+        <div class="sr-info">${fmt(r.valor)} · ${r.cidade}${r.ano?' · '+r.ano:''}${r.km?' · '+fmtKm(r.km):''}</div>
+      </div>`).join('');
+    results.querySelectorAll('.sr-item').forEach(el=>el.addEventListener('click',()=>{
+      showCarDetail(matches[+el.dataset.i]);results.style.display='none';
+      input.value=matches[+el.dataset.i].modelo||matches[+el.dataset.i].marca;
+    }));
+    results.style.display='block';
+  });
+  document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))results.style.display='none';});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAR DETAIL
+// ═══════════════════════════════════════════════════════════════════════════════
+function showCarDetail(r){
+  document.getElementById('det-marca').textContent=r.marca;
+  document.getElementById('det-modelo').textContent=r.modelo||'—';
+  document.getElementById('det-titulo').textContent=r.titulo;
+  document.getElementById('det-price').textContent=fmt(r.valor);
+  document.getElementById('det-cidade').textContent=r.cidade;
+  document.getElementById('det-bairro').textContent=r.bairro||'—';
+  document.getElementById('det-ano').textContent=r.ano||'—';
+  document.getElementById('det-km').textContent=fmtKm(r.km);
+  const lnk=document.getElementById('det-link');
+  if(r.link){lnk.href=r.link;lnk.style.display='block';}else lnk.style.display='none';
+  document.getElementById('car-detail').style.display='block';
+}
+function closeDetail(){document.getElementById('car-detail').style.display='none';}
+document.getElementById('closeDetail').addEventListener('click',closeDetail);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: CIDADES
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderCidades(){
+  const recs=getFiltered(),stats=cityStats(recs);
+  const maxM=d3.max(stats,c=>c.preco_medio)||1,minM=d3.min(stats,c=>c.preco_medio)||0;
+  const c=document.getElementById('tab-cidades');c.innerHTML='';
+  stats.forEach((s,i)=>{
+    const pct=(s.preco_medio-minM)/(maxM-minM||1)*100;
+    const div=document.createElement('div');div.className='city-card';
+    div.innerHTML=`
+      <div class="rank-badge">#${i+1}</div>
+      <div class="cc-name">${s.cidade}</div>
+      <div class="cc-price">${fmt(s.preco_medio)}</div>
+      <div class="cc-min">↓ mín ${fmt(s.preco_min)}</div>
+      <div class="cc-count">${s.total} anúncio${s.total>1?'s':''} · ${s.marcas.length} marca${s.marcas.length>1?'s':''}</div>
+      <div class="cc-bar"><div class="cc-bar-fill" style="width:${pct}%"></div></div>`;
+    div.addEventListener('click',()=>focusCity(s.cidade,div));
+    c.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FOCUS CITY — zoom + smart radial expansion
+// ═══════════════════════════════════════════════════════════════════════════════
+function focusCity(cidade, cardEl){
+  if(viewMode!=='grafo')return;
+  document.querySelectorAll('.city-card').forEach(c=>c.classList.remove('selected'));
+  if(cardEl)cardEl.classList.add('selected');
+
+  d3.selectAll('.node-city').attr('opacity',n=>n.id===cidade?1:0.1);
+  d3.selectAll('.node-car').attr('opacity',n=>n.cidadeTarget===cidade?1:0.04);
+  d3.selectAll('.link').attr('opacity',l=>{
+    const tgt=typeof l.target==='object'?l.target.id:l.target;
+    return tgt===cidade?0.5:0.015;
+  });
+
+  const cityNode=(window._graphCidades||[]).find(c=>c.id===cidade);
+  if(!cityNode||!simulation)return;
+
+  const cars=(window._graphCarNodes||[]).filter(n=>n.cidadeTarget===cidade);
+  const n=cars.length;
+
+  // ── Smart radial layout ──────────────────────────────────────────────────
+  // Sort by price so the radial order is visually meaningful (cheapest→CW)
+  cars.sort((a,b)=>a.record.valor-b.record.valor);
+
+  // Adaptive radius: keeps spacing between 28-45px regardless of car count
+  const minSpacing=32, maxR=380;
+  const circumference=n*minSpacing;
+  const radius=Math.min(maxR, Math.max(80, circumference/(2*Math.PI)));
+
+  // Pin city at current position
+  cityNode.fx=cityNode.x; cityNode.fy=cityNode.y;
+
+  cars.forEach((carN,i)=>{
+    const angle=-Math.PI/2+(2*Math.PI*i)/n; // start from top, go CW
+    carN.fx=cityNode.x+Math.cos(angle)*radius;
+    carN.fy=cityNode.y+Math.sin(angle)*radius;
+  });
+
+  simulation.alpha(0.5).restart();
+
+  // ── Zoom to fit the whole cluster ────────────────────────────────────────
+  if(zoomBehavior){
+    const svg=d3.select('#main-svg');
+    const W=document.getElementById('graph-area').clientWidth;
+    const H=document.getElementById('graph-area').clientHeight;
+    const padding=80;
+    const clusterW=(radius+50)*2, clusterH=(radius+50)*2;
+    const scale=Math.min(
+      (W-padding*2)/clusterW,
+      (H-padding*2)/clusterH,
+      2.2 // never zoom in so much labels disappear
+    );
+    const tx=W/2-scale*cityNode.x;
+    const ty=H/2-scale*cityNode.y;
+    svg.transition().duration(750).ease(d3.easeCubicInOut)
+      .call(zoomBehavior.transform,d3.zoomIdentity.translate(tx,ty).scale(scale));
+  }
+
+  document.getElementById('btnReset').style.display='inline-block';
+}
+
+function resetFocus(){
+  d3.selectAll('.node-city,.node-car').attr('opacity',1);
+  d3.selectAll('.link').attr('opacity',.2);
+  const all=[...(window._graphCidades||[]),...(window._graphCarNodes||[])];
+  all.forEach(n=>{n.fx=null;n.fy=null;});
+  if(simulation)simulation.alpha(0.35).restart();
+  const svg=d3.select('#main-svg');
+  const W=document.getElementById('graph-area').clientWidth;
+  const H=document.getElementById('graph-area').clientHeight;
+  if(zoomBehavior)
+    svg.transition().duration(600).ease(d3.easeCubicInOut)
+      .call(zoomBehavior.transform,d3.zoomIdentity.translate(W/2,H/2).scale(0.82).translate(-W/2,-H/2));
+  document.querySelectorAll('.city-card').forEach(c=>c.classList.remove('selected'));
+  if(!algoActive)document.getElementById('btnReset').style.display='none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: ESTATÍSTICAS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderEstatisticas(){
+  const recs=getFiltered(),vals=recs.map(r=>r.valor).sort((a,b)=>a-b),n=vals.length;
+  if(!n){document.getElementById('tab-estatisticas').innerHTML='<div class="no-data">Sem dados</div>';return;}
+  const mean=d3.mean(vals),median=d3.median(vals),std=d3.deviation(vals)||0;
+  const q1=d3.quantile(vals,.25),q3=d3.quantile(vals,.75),iqr=q3-q1;
+  const low=q1-1.5*iqr,up=q3+1.5*iqr;
+  const bkt={};vals.forEach(v=>{const k=Math.floor(v/10000)*10;bkt[k]=(bkt[k]||0)+1;});
+  const mk=Object.keys(bkt).sort((a,b)=>bkt[b]-bkt[a])[0];
+  const bins=d3.bin().thresholds(10)(vals);
+  document.getElementById('tab-estatisticas').innerHTML=`
+    <div class="sec-hdr">Tendência central</div>
+    <div class="stat-row"><span class="stat-label">Média</span><span class="stat-val yellow">${fmt(mean)}</span></div>
+    <div class="stat-row"><span class="stat-label">Mediana</span><span class="stat-val green">${fmt(median)}</span></div>
+    <div class="stat-row"><span class="stat-label">Moda (faixa)</span><span class="stat-val">${mk}k–${+mk+10}k</span></div>
+    <div class="stat-row"><span class="stat-label">Total</span><span class="stat-val">${n}</span></div>
+    <div class="sec-hdr" style="margin-top:14px">Dispersão</div>
+    <div class="stat-row"><span class="stat-label">Desvio padrão</span><span class="stat-val">${fmt(std)}</span></div>
+    <div class="stat-row"><span class="stat-label">Q1 (25%)</span><span class="stat-val green">${fmt(q1)}</span></div>
+    <div class="stat-row"><span class="stat-label">Q3 (75%)</span><span class="stat-val red">${fmt(q3)}</span></div>
+    <div class="stat-row"><span class="stat-label">IQR</span><span class="stat-val">${fmt(iqr)}</span></div>
+    <div class="stat-row"><span class="stat-label">Outliers (Tukey)</span><span class="stat-val red">${vals.filter(v=>v<low||v>up).length}</span></div>
+    <div class="sec-hdr" style="margin-top:14px">Amplitude</div>
+    <div class="stat-row"><span class="stat-label">Mínimo</span><span class="stat-val green">${fmt(vals[0])}</span></div>
+    <div class="stat-row"><span class="stat-label">Máximo</span><span class="stat-val red">${fmt(vals[n-1])}</span></div>
+    <div class="stat-row"><span class="stat-label">Amplitude</span><span class="stat-val">${fmt(vals[n-1]-vals[0])}</span></div>
+    <div class="sec-hdr" style="margin-top:14px">Distribuição</div>
+    <svg id="hist-svg" height="90" style="width:100%"></svg>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:'JetBrains Mono';margin-top:3px">
+      <span>${fmt(vals[0])}</span><span style="color:var(--accent)">▲ mediana</span><span>${fmt(vals[n-1])}</span>
+    </div>`;
+  const W2=document.getElementById('tab-estatisticas').clientWidth-28,H2=80;
+  const sv=d3.select('#hist-svg').attr('width',W2);
+  const xS=d3.scaleLinear().domain([vals[0],vals[n-1]]).range([0,W2]);
+  const yS=d3.scaleLinear().domain([0,d3.max(bins,b=>b.length)]).range([H2,0]);
+  const cS=d3.scaleLinear().domain([vals[0],vals[n-1]]).range(['#3ecf8e','#e84d3d']);
+  sv.selectAll('rect').data(bins).enter().append('rect')
+    .attr('x',b=>xS(b.x0)+1).attr('width',b=>Math.max(0,xS(b.x1)-xS(b.x0)-2))
+    .attr('y',b=>yS(b.length)).attr('height',b=>H2-yS(b.length))
+    .attr('fill',b=>cS((b.x0+b.x1)/2)).attr('rx',2);
+  sv.append('line').attr('x1',xS(median)).attr('x2',xS(median)).attr('y1',0).attr('y2',H2)
+    .attr('stroke','#f0c040').attr('stroke-width',1.5).attr('stroke-dasharray','3,2');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PANEL: FREQUÊNCIAS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderFrequencias(){
+  const recs=getFiltered(),n=recs.length;
+  const bMap={},fMap={},cheapByBrand={};
+  const order=['Econômico','Intermediário','Padrão','Premium','Luxo'];
+  recs.forEach(r=>{
+    bMap[r.marca]=(bMap[r.marca]||0)+1;
+    const f=cat(r.valor);fMap[f]=(fMap[f]||0)+1;
+    if(!cheapByBrand[r.marca]||r.valor<cheapByBrand[r.marca].valor)cheapByBrand[r.marca]=r;
+  });
+  const byBrand=Object.entries(bMap).sort((a,b)=>b[1]-a[1]);
+  const byFaixa=order.filter(f=>fMap[f]).map(f=>[f,fMap[f]]);
+  const maxB=byBrand[0]?.[1]||1,maxF=byFaixa[0]?.[1]||1;
+  document.getElementById('tab-frequencias').innerHTML=`
+    <div class="sec-hdr">Frequência por marca</div>
+    ${byBrand.map(([b,c])=>`<div class="freq-row">
+      <div class="freq-label" title="${b}">${b}</div>
+      <div class="freq-track"><div class="freq-fill" style="width:${c/maxB*100}%;background:#4d9de0"></div></div>
+      <div class="freq-count">${c}</div></div>`).join('')}
+    <div class="sec-hdr" style="margin-top:14px">Faixa de preço</div>
+    ${byFaixa.map(([f,c])=>`<div class="freq-row">
+      <div class="freq-label"><span class="faixa-badge ${FK[f]}">${f.split(' ')[0]}</span></div>
+      <div class="freq-track"><div class="freq-fill" style="width:${c/maxF*100}%;background:${FC[f]}"></div></div>
+      <div class="freq-count">${c}</div></div>`).join('')}
+    <div class="sec-hdr" style="margin-top:14px">P(faixa)</div>
+    ${byFaixa.map(([f,c])=>`<div class="stat-row">
+      <span class="stat-label">${f.split(' ')[0]}</span>
+      <span class="stat-val" style="color:${FC[f]}">${(c/n*100).toFixed(1)}%</span></div>`).join('')}
+    <div class="sec-hdr" style="margin-top:14px">Menor preço por marca</div>
+    ${byBrand.map(([b])=>{const r=cheapByBrand[b];return`<div class="stat-row cheap-row" data-marca="${b}" style="cursor:pointer">
+      <span class="stat-label">${b}<br><span style="color:var(--muted);font-size:10px;font-family:'JetBrains Mono'">${(r.modelo||'').slice(0,16)}</span></span>
+      <span class="stat-val green" style="font-size:10px;text-align:right">${fmt(r.valor)}<br><span style="color:var(--muted)">${r.cidade}</span></span>
+    </div>`}).join('')}`;
+  document.querySelectorAll('.cheap-row').forEach(el=>
+    el.addEventListener('click',()=>showCarDetail(cheapByBrand[el.dataset.marca])));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRAPH: FORCE-DIRECTED (carros individuais)
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderGrafo(){
+  const recs=getFiltered(),svg=d3.select('#main-svg');
+  svg.selectAll('*').remove();if(simulation)simulation.stop();
+  const W=document.getElementById('graph-area').clientWidth;
+  const H=document.getElementById('graph-area').clientHeight;
+  zoomBehavior=d3.zoom().scaleExtent([.06,8]).on('zoom',e=>graphG.attr('transform',e.transform));
+  svg.call(zoomBehavior);
+  graphG=svg.append('g');
+  const g=graphG;
+
+  // Cidade nodes
+  const cMap={};
+  recs.forEach(r=>{
+    if(!cMap[r.cidade])cMap[r.cidade]={id:r.cidade,type:'city',vals:[],faixas:{}};
+    cMap[r.cidade].vals.push(r.valor);
+    const f=cat(r.valor);cMap[r.cidade].faixas[f]=(cMap[r.cidade].faixas[f]||0)+1;
+  });
+  const cidades=Object.values(cMap);
+  cidades.forEach(c=>{
+    c.mean=d3.mean(c.vals);c.min=d3.min(c.vals);c.count=c.vals.length;
+    const dom=Object.entries(c.faixas).sort((a,b)=>b[1]-a[1])[0][0];
+    c.color=FC[dom];
+  });
+
+  // Car nodes (one per listing)
+  const carNodes=recs.map((r,i)=>({
+    id:'car_'+i,type:'car',record:r,
+    faixa:cat(r.valor),cidadeTarget:r.cidade
+  }));
+
+  window._graphCidades=cidades;
+  window._graphCarNodes=carNodes;
+
+  const links=carNodes.map(c=>({source:c.id,target:c.cidadeTarget}));
+  const nodes=[...cidades,...carNodes];
+  const sCity=d3.scaleSqrt().domain([1,d3.max(cidades,c=>c.count)||1]).range([22,52]);
+
+  // Edges
+  const link=g.append('g').selectAll('line').data(links).enter().append('line')
+    .attr('class','link')
+    .attr('stroke',l=>FC[carNodes.find(n=>n.id===(typeof l.source==='object'?l.source.id:l.source))?.faixa]||'#444')
+    .attr('stroke-opacity',.2).attr('stroke-width',.8);
+
+  // Nodes
+  const node=g.append('g').selectAll('g').data(nodes).enter().append('g')
+    .attr('class',d=>d.type==='city'?'node-city':'node-car')
+    .style('cursor','pointer')
+    .call(d3.drag().on('start',ds).on('drag',dd).on('end',de));
+
+  node.each(function(d){
+    const el=d3.select(this);
+    if(d.type==='city'){
+      const r=sCity(d.count);
+      el.append('circle').attr('r',r).attr('fill',d.color).attr('fill-opacity',.12)
+        .attr('stroke',d.color).attr('stroke-width',2.5).attr('stroke-opacity',.75);
+      el.append('circle').attr('r',r+5).attr('fill','none').attr('stroke',d.color)
+        .attr('stroke-width',.5).attr('stroke-opacity',.2).attr('stroke-dasharray','4,3');
+      el.append('text').attr('text-anchor','middle').attr('dy','.35em')
+        .attr('fill',d.color).attr('font-family','Syne').attr('font-weight',700)
+        .attr('font-size',Math.max(9,Math.min(14,r*.38))).attr('pointer-events','none')
+        .text(d.id.length>13?d.id.split(' ')[0]:d.id);
+    } else {
+      const cor=FC[d.faixa];
+      const label=(d.record.modelo||d.record.marca||'').split(' ').slice(0,2).join(' ');
+      el.append('circle').attr('r',7).attr('fill',cor).attr('fill-opacity',.85)
+        .attr('stroke','#fff').attr('stroke-width',.6).attr('stroke-opacity',.25);
+      el.append('text').attr('x',10).attr('dy','.35em')
+        .attr('fill',cor).attr('font-family','Syne').attr('font-weight',600)
+        .attr('font-size',8).attr('pointer-events','none').attr('opacity',.88).text(label);
+    }
+  });
+
+  const tt=document.getElementById('tooltip');
+  node.on('mousemove',(ev,d)=>{
+    if(d.type==='city'){
+      tt.innerHTML=`<div class="tt-title">${d.id}</div>Média: <b>${fmt(d.mean)}</b><br>Mín: <b>${fmt(d.min)}</b><br>Anúncios: <b>${d.count}</b>`;
+    } else {
+      const r=d.record;
+      tt.innerHTML=`<div class="tt-title">${r.marca} ${r.modelo||''}</div><b>${fmt(r.valor)}</b><br>`+
+        `${r.cidade}${r.bairro&&r.bairro!=='N/D'?' · '+r.bairro:''}<br>`+
+        `${r.ano?'Ano '+r.ano:''}${r.km?' · '+fmtKm(r.km):''}`;
+    }
+    tt.style.opacity=1;tt.style.left=(ev.offsetX+14)+'px';tt.style.top=(ev.offsetY-10)+'px';
+  }).on('mouseleave',()=>tt.style.opacity=0)
+    .on('click',(_,d)=>{
+      if(d.type==='city'){
+        const sub=recs.filter(r=>r.cidade===d.id);
+        showCarDetail(sub.reduce((a,c)=>c.valor<a.valor?c:a,sub[0]));
+      } else showCarDetail(d.record);
+    });
+
+  // Simulation — distance proportional to city size
+  simulation=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(d=>d.id)
+      .distance(l=>{
+        // Larger cities need more space for their cars
+        const tgt=typeof l.target==='object'?l.target:cidades.find(c=>c.id===l.target);
+        return tgt?40+tgt.count*3:55;
+      }).strength(.65))
+    .force('charge',d3.forceManyBody().strength(d=>d.type==='city'?-600:-45))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide().radius(d=>d.type==='city'?sCity(d.count)+12:9).strength(.8))
+    .on('tick',()=>{
+      link.attr('x1',l=>l.source.x).attr('y1',l=>l.source.y)
+          .attr('x2',l=>l.target.x).attr('y2',l=>l.target.y);
+      node.attr('transform',d=>`translate(${d.x},${d.y})`);
+    });
+
+  // Re-apply algo overlay if active
+  if(algoActive==='prim')setTimeout(runPrim,800);
+  else if(algoActive==='kruskal')setTimeout(runKruskal,800);
+
+  function ds(e){if(!e.active)simulation.alphaTarget(.3).restart();e.subject.fx=e.subject.x;e.subject.fy=e.subject.y;}
+  function dd(e){e.subject.fx=e.x;e.subject.fy=e.y;}
+  function de(e){if(!e.active)simulation.alphaTarget(0);e.subject.fx=null;e.subject.fy=null;}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRAPH: BUBBLES
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderBolhas(){
+  const recs=getFiltered(),svg=d3.select('#main-svg');
+  svg.selectAll('*').remove();if(simulation)simulation.stop();
+  const W=document.getElementById('graph-area').clientWidth;
+  const H=document.getElementById('graph-area').clientHeight;
+  const g=svg.append('g');
+  svg.call(d3.zoom().scaleExtent([.2,5]).on('zoom',e=>g.attr('transform',e.transform)));
+  const stats=cityStats(recs);
+  const tt=document.getElementById('tooltip');
+  const rS=d3.scaleSqrt().domain([d3.min(stats,c=>c.preco_medio),d3.max(stats,c=>c.preco_medio)]).range([22,72]);
+  const cS=d3.scaleSequential(d3.interpolateRdYlGn).domain([d3.max(stats,c=>c.preco_medio),d3.min(stats,c=>c.preco_medio)]);
+  simulation=d3.forceSimulation(stats)
+    .force('charge',d3.forceManyBody().strength(8))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide(d=>rS(d.preco_medio)+5));
+  const bub=g.selectAll('g').data(stats).enter().append('g').style('cursor','pointer');
+  bub.append('circle').attr('r',d=>rS(d.preco_medio)).attr('fill',d=>cS(d.preco_medio)).attr('fill-opacity',.78).attr('stroke','#fff3').attr('stroke-width',1);
+  bub.append('text').attr('text-anchor','middle').attr('dy','-.2em').attr('fill','#fff').attr('font-family','Syne').attr('font-weight',700)
+    .attr('font-size',d=>Math.max(8,Math.min(13,rS(d.preco_medio)*.28))).text(d=>d.cidade.split(' ')[0]);
+  bub.append('text').attr('text-anchor','middle').attr('dy','1em').attr('fill','#ffffffbb').attr('font-family','JetBrains Mono')
+    .attr('font-size',d=>Math.max(7,Math.min(11,rS(d.preco_medio)*.22))).text(d=>'R$'+(d.preco_medio/1000).toFixed(0)+'k');
+  bub.on('mousemove',(ev,d)=>{
+    tt.innerHTML=`<div class="tt-title">${d.cidade}</div>Média: <b>${fmt(d.preco_medio)}</b><br>Mín: <b>${fmt(d.preco_min)}</b><br>Anúncios: <b>${d.total}</b>`;
+    tt.style.opacity=1;tt.style.left=(ev.offsetX+14)+'px';tt.style.top=(ev.offsetY-10)+'px';
+  }).on('mouseleave',()=>tt.style.opacity=0)
+    .on('click',(_,d)=>{
+      const sub=recs.filter(r=>r.cidade===d.cidade);
+      showCarDetail(sub.reduce((a,c)=>c.valor<a.valor?c:a,sub[0]));
+    });
+  simulation.on('tick',()=>bub.attr('transform',d=>`translate(${d.x},${d.y})`));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██████████████████  ALGORITMOS DE GRAFOS  ████████████████████████████████████
+//
+// Modelagem do grafo de cidades:
+//   • Vértices  = cidades
+//   • Arestas   = todos os pares de cidades (grafo completo)
+//   • Peso      = diferença de preço médio entre as duas cidades
+//                 → arestas leves conectam cidades com preços semelhantes
+//
+// Prim:    encontra a Árvore Geradora Mínima (MST) partindo da cidade mais
+//          barata. Revela a "rota de menor distância econômica" entre cidades.
+//
+// Kruskal: também encontra a MST, mas escolhendo globalmente as arestas de
+//          menor peso em ordem crescente. O resultado é o mesmo (MST única),
+//          mas a animação mostra as arestas sendo adicionadas pelo peso —
+//          tornando visível quais pares de cidades são economicamente
+//          mais próximos no mercado.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function buildCityGraph(){
+  const recs=getFiltered();
+  const stats=cityStats(recs);
+  // All pairs → complete graph
+  const edges=[];
+  for(let i=0;i<stats.length;i++){
+    for(let j=i+1;j<stats.length;j++){
+      edges.push({
+        u:stats[i].cidade,v:stats[j].cidade,
+        weight:Math.abs(stats[i].preco_medio-stats[j].preco_medio),
+        meanU:stats[i].preco_medio,meanV:stats[j].preco_medio
+      });
+    }
+  }
+  return{nodes:stats,edges};
+}
+
+// ── Union-Find (para Kruskal) ──────────────────────────────────────────────────
+function makeUF(ids){
+  const p={},r={};
+  ids.forEach(id=>{p[id]=id;r[id]=0;});
+  function find(x){if(p[x]!==x)p[x]=find(p[x]);return p[x];}
+  function union(a,b){const ra=find(a),rb=find(b);if(ra===rb)return false;if(r[ra]<r[rb])p[ra]=rb;else if(r[ra]>r[rb])p[rb]=ra;else{p[rb]=ra;r[ra]++;}return true;}
+  return{find,union};
+}
+
+// ── Draw MST overlay on the existing city layer ────────────────────────────────
+function drawMSTOverlay(mstEdges, color, animDelay=60){
+  if(!graphG)return;
+  const cidades=window._graphCidades||[];
+  const posMap={};cidades.forEach(c=>posMap[c.id]={x:c.x,y:c.y});
+
+  // Dim all existing car-city edges
+  d3.selectAll('.link').attr('opacity',.04);
+  d3.selectAll('.node-car').attr('opacity',.08);
+  d3.selectAll('.node-city').attr('opacity',.4);
+
+  // Draw MST edges one by one with animation
+  const mstG=graphG.append('g').attr('class','mst-layer');
+  let i=0;
+  function step(){
+    if(i>=mstEdges.length)return showAlgoSummary(mstEdges,color);
+    const e=mstEdges[i];
+    const pu=posMap[e.u],pv=posMap[e.v];
+    if(!pu||!pv){i++;return setTimeout(step,animDelay);}
+    // Animated line
+    const line=mstG.append('line')
+      .attr('x1',pu.x).attr('y1',pu.y).attr('x2',pu.x).attr('y2',pu.y)
+      .attr('stroke',color).attr('stroke-width',2.5).attr('stroke-opacity',0)
+      .attr('stroke-linecap','round');
+    line.transition().duration(animDelay*4)
+      .attr('x2',pv.x).attr('y2',pv.y).attr('stroke-opacity',.85);
+    // Weight label at midpoint
+    mstG.append('text')
+      .attr('x',(pu.x+pv.x)/2).attr('y',(pu.y+pv.y)/2-5)
+      .attr('text-anchor','middle').attr('fill',color)
+      .attr('font-family','JetBrains Mono').attr('font-size',9).attr('opacity',0)
+      .text('Δ'+fmt(e.weight))
+      .transition().delay(animDelay*3).duration(200).attr('opacity',.8);
+    // Highlight endpoints
+    d3.selectAll('.node-city')
+      .filter(d=>d.id===e.u||d.id===e.v)
+      .transition().duration(200).attr('opacity',1);
+    i++;
+    setTimeout(step,animDelay*2);
+  }
+  setTimeout(step,300);
+}
+
+function showAlgoSummary(mstEdges, color){
+  const totalCost=mstEdges.reduce((s,e)=>s+e.weight,0);
+  const leg=document.getElementById('algo-legend');
+  leg.style.display='block';
+  document.getElementById('al-body').innerHTML=
+    `<div class="al-step">Arestas na MST: <b>${mstEdges.length}</b></div>`+
+    `<div class="al-step">Custo total (Δpreço): <span class="al-cost">${fmt(totalCost)}</span></div>`+
+    `<div class="al-step" style="margin-top:8px;color:var(--text)">Pares de cidades mais próximas economicamente:</div>`+
+    mstEdges.slice(0,4).map(e=>
+      `<div class="al-step">• ${e.u.split(' ')[0]} ↔ ${e.v.split(' ')[0]} <span class="al-cost">Δ${fmt(e.weight)}</span></div>`
+    ).join('');
+}
+
+// ── PRIM ──────────────────────────────────────────────────────────────────────
+function runPrim(){
+  algoActive='prim';
+  document.getElementById('btnReset').style.display='inline-block';
+  document.getElementById('algo-legend').style.display='none';
+  document.getElementById('al-title').textContent='🌲 Prim — MST por Preço Médio';
+  d3.select('.mst-layer').remove();
+
+  const {nodes,edges}=buildCityGraph();
+  if(nodes.length<2)return;
+
+  // Sort edges by weight for fast lookup
+  const adjMap={};
+  edges.forEach(e=>{
+    if(!adjMap[e.u])adjMap[e.u]=[];
+    if(!adjMap[e.v])adjMap[e.v]=[];
+    adjMap[e.u].push({to:e.v,weight:e.weight,e});
+    adjMap[e.v].push({to:e.u,weight:e.weight,e});
+  });
+
+  // Start from cheapest city
+  const start=nodes.reduce((a,b)=>b.preco_medio<a.preco_medio?b:a).cidade;
+  const inMST=new Set([start]);
+  const mstEdges=[];
+
+  while(inMST.size<nodes.length){
+    let best=null;
+    inMST.forEach(u=>{
+      (adjMap[u]||[]).forEach(({to,weight,e})=>{
+        if(!inMST.has(to)&&(!best||weight<best.weight))best={...e,u,v:to};
+      });
+    });
+    if(!best)break;
+    inMST.add(best.v);
+    mstEdges.push(best);
+  }
+
+  drawMSTOverlay(mstEdges,'#3ecf8e',80);
+}
+
+// ── KRUSKAL ───────────────────────────────────────────────────────────────────
+function runKruskal(){
+  algoActive='kruskal';
+  document.getElementById('btnReset').style.display='inline-block';
+  document.getElementById('algo-legend').style.display='none';
+  document.getElementById('al-title').textContent='🔗 Kruskal — MST por Preço Médio';
+  d3.select('.mst-layer').remove();
+
+  const {nodes,edges}=buildCityGraph();
+  if(nodes.length<2)return;
+
+  const sorted=[...edges].sort((a,b)=>a.weight-b.weight);
+  const uf=makeUF(nodes.map(n=>n.cidade));
+  const mstEdges=[];
+
+  for(const e of sorted){
+    if(mstEdges.length>=nodes.length-1)break;
+    if(uf.union(e.u,e.v))mstEdges.push(e);
+  }
+
+  drawMSTOverlay(mstEdges,'#9b59b6',70);
+}
+
+function clearAlgo(){
+  algoActive=null;
+  d3.select('.mst-layer').remove();
+  document.getElementById('algo-legend').style.display='none';
+  document.getElementById('btnPrim').classList.remove('prim-active');
+  document.getElementById('btnKruskal').classList.remove('kruskal-active');
+}
+
+// Algo button handlers
+document.getElementById('btnPrim').addEventListener('click',()=>{
+  if(viewMode!=='grafo'){viewMode='grafo';document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode==='grafo');});renderGrafo();renderCidades();renderEstatisticas();renderFrequencias();}
+  clearAlgo();
+  document.getElementById('btnPrim').classList.add('prim-active');
+  algoActive='prim';
+  if(simulation&&simulation.alpha()<0.05)runPrim();
+  else{algoActive='prim';} // renderGrafo will call runPrim after layout settles
+});
+
+document.getElementById('btnKruskal').addEventListener('click',()=>{
+  if(viewMode!=='grafo'){viewMode='grafo';document.querySelectorAll('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode==='grafo');});renderGrafo();renderCidades();renderEstatisticas();renderFrequencias();}
+  clearAlgo();
+  document.getElementById('btnKruskal').classList.add('kruskal-active');
+  algoActive='kruskal';
+  if(simulation&&simulation.alpha()<0.05)runKruskal();
+  else{algoActive='kruskal';}
+});
+
+document.getElementById('btnReset').addEventListener('click',()=>{
+  clearAlgo();
+  resetFocus();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODE TOGGLE + REFRESH
+// ═══════════════════════════════════════════════════════════════════════════════
+document.querySelectorAll('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');viewMode=btn.dataset.mode;renderGraph();
+}));
+
+function renderGraph(){if(viewMode==='grafo')renderGrafo();else renderBolhas();}
+function refresh(){
+  document.getElementById('btnReset').style.display='none';
+  document.getElementById('algo-legend').style.display='none';
+  renderGraph();renderCidades();renderEstatisticas();renderFrequencias();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA WARNING
+// ═══════════════════════════════════════════════════════════════════════════════
+function showDataWarning(){
+  document.getElementById('graph-area').innerHTML=`
+    <div class="data-warn">
+      <div style="font-size:28px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px">Arquivo <code>dados_olx.js</code> não encontrado</div>
+      <div>1. Execute <code>python scrapPaginas_v4.py</code><br>
+           2. Coloque <code>dados_olx.js</code> e <code>AnalisadorOLX.html</code> na mesma pasta<br>
+           3. Reabra o HTML no navegador</div>
+    </div>`;
+  ['cidades','estatisticas','frequencias'].forEach(t=>
+    document.getElementById('tab-'+t).innerHTML='<div class="no-data">Aguardando dados_olx.js</div>');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  if(!loadData()){showDataWarning();return;}
+  initBrandFilter();initSearch();refresh();
+  window.addEventListener('resize',renderGraph);
+});
+</script>
+</body>
+</html>
