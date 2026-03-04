@@ -1,7 +1,3 @@
-Scraper OLX — Carros
-
----
-
 ## FLUXO DE USO
 
 
