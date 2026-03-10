@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0"
+    />
+    <meta name="theme-color" content="#0d0f14" />
+    <title>OLX Car Analyzer — Bahia</title>
+    <script src="js/d3.min.js" defer></script>
+    <script src="js/script.js" defer></script>
+    <script src="dados_olx.js" defer></script>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>OLX ANALYZER <span>— Bahia</span></h1>
+        <div class="hdr-controls">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input type="text" id="searchInput" placeholder="Buscar carro…" />
+            <div id="searchResults"></div>
+          </div>
+          <select id="filterBrand" class="pill-sel">
+            <option value="">Todas as marcas</option>
+          </select>
+          <button class="pill active" data-mode="grafo">Grafo</button>
+          <button class="pill" data-mode="bolhas">Bolhas</button>
+          <button class="pill pill-algo" id="btnPrim">🌲 Prim</button>
+          <button class="pill pill-algo" id="btnKruskal">🔗 Kruskal</button>
+          <button
+            class="pill active"
+            id="btnZoomLock"
+            title="Ativar/desativar zoom automático ao clicar numa cidade"
+          >
+            🔍 Auto-zoom
+          </button>
+          <button
+            class="pill"
+            id="btnReset"
+            style="display: none; border-color: var(--muted)"
+          >
+            ✕ Limpar
+          </button>
+          <button class="pill" id="btnCenter" title="Centralizar grafo">
+            ⊹ Centralizar
+          </button>
+        </div>
+      </header>
+
+      <div id="graph-area">
+        <svg id="main-svg"></svg>
+        <div id="car-detail">
+          <span class="cd-close" id="closeDetail">✕</span>
+          <div class="cd-marca" id="det-marca"></div>
+          <div class="cd-modelo" id="det-modelo"></div>
+          <div class="cd-titulo" id="det-titulo"></div>
+          <div class="cd-price" id="det-price"></div>
+          <div class="cd-row">
+            <span class="cd-lbl">Cidade</span
+            ><span class="cd-val" id="det-cidade"></span>
+          </div>
+          <div class="cd-row">
+            <span class="cd-lbl">Bairro</span
+            ><span class="cd-val" id="det-bairro"></span>
+          </div>
+          <div class="cd-row">
+            <span class="cd-lbl">Ano</span
+            ><span class="cd-val" id="det-ano"></span>
+          </div>
+          <div class="cd-row">
+            <span class="cd-lbl">KM</span
+            ><span class="cd-val" id="det-km"></span>
+          </div>
+          <a class="cd-link" id="det-link" target="_blank" rel="nofollow"
+            >↗ Ver anúncio na OLX</a
+          >
+        </div>
+        <div id="algo-legend">
+          <div class="al-title" id="al-title"></div>
+          <div id="al-body"></div>
+        </div>
+        <div class="tooltip" id="tooltip"></div>
+        <div id="legend">
+          <div class="leg-title">Faixa de preço</div>
+          <div class="leg-row">
+            <div class="leg-dot" style="background: #3ecf8e"></div>
+            Econômico (&lt;35k)
+          </div>
+          <div class="leg-row">
+            <div class="leg-dot" style="background: #f0c040"></div>
+            Intermediário (35–70k)
+          </div>
+          <div class="leg-row">
+            <div class="leg-dot" style="background: #e67e22"></div>
+            Padrão (70–120k)
+          </div>
+          <div class="leg-row">
+            <div class="leg-dot" style="background: #e84d3d"></div>
+            Premium (120–250k)
+          </div>
+          <div class="leg-row">
+            <div class="leg-dot" style="background: #9b59b6"></div>
+            Luxo (&gt;250k)
+          </div>
+        </div>
+      </div>
+
+      <div id="side-panel">
+        <div class="section-tab">
+          <button class="tab-btn active" data-tab="cidades">Cidades</button>
+          <button class="tab-btn" data-tab="estatisticas">Stats</button>
+          <button class="tab-btn" data-tab="frequencias">Freq.</button>
+        </div>
+        <div class="tab-content active" id="tab-cidades"></div>
+        <div class="tab-content" id="tab-estatisticas"></div>
+        <div class="tab-content" id="tab-frequencias"></div>
+      </div>
+    </div>
+  </body>
+</html>
